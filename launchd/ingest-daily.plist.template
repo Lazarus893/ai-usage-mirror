@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OPTIONAL nightly warm-up (default OFF, per ARCHITECTURE.md §10 / §13).
+  It only runs `mirror ingest` (incremental warm of the SQLite store) so on-demand
+  reports are instant. It does NOT inject anything, does NOT run the LLM report.
+
+  To enable:
+    1. Replace {{PYTHON}} with `which python3` and {{SCRIPTS}} with the absolute
+       path to this skill's scripts/ dir.
+    2. cp this file to ~/Library/LaunchAgents/com.example.ai-usage-mirror.plist
+    3. launchctl load ~/Library/LaunchAgents/com.example.ai-usage-mirror.plist
+  To disable:
+    launchctl unload ~/Library/LaunchAgents/com.example.ai-usage-mirror.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.example.ai-usage-mirror</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>{{PYTHON}}</string>
+    <string>{{SCRIPTS}}/mirror.py</string>
+    <string>ingest</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>4</integer><key>Minute</key><integer>0</integer></dict>
+  <key>RunAtLoad</key><false/>
+  <key>StandardErrorPath</key><string>{{SCRIPTS}}/../.state/launchd.log</string>
+  <key>StandardOutPath</key><string>{{SCRIPTS}}/../.state/launchd.log</string>
+</dict>
+</plist>

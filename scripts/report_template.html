@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>镜 · AI 使用审计</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f4f1ea; --panel:#efeae0; --rule:#ddd6c8;
+    --ink:#211f1a; --ink-soft:#726b5d; --ink-faint:#a49c8c;
+    --accent:#a23b1e; --accent-soft:rgba(162,59,30,.10);
+    --serif:'Newsreader','Songti SC',Georgia,'Times New Roman',serif;
+    --sans:'Inter','PingFang SC',-apple-system,sans-serif;
+    --mono:'SF Mono','JetBrains Mono',ui-monospace,'Menlo',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.6;
+    background-image:radial-gradient(rgba(120,110,90,.035) .5px,transparent .5px);background-size:4px 4px}
+  ::selection{background:var(--accent);color:var(--paper)}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 40px}
+  a{color:var(--accent);text-decoration:none}
+
+  /* ---- masthead ---- */
+  .masthead{padding:88px 0 30px;border-bottom:2px solid var(--ink)}
+  .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:var(--accent);margin-bottom:22px}
+  .title{font-family:var(--serif);font-weight:400;font-size:clamp(48px,7vw,84px);line-height:.98;letter-spacing:-.01em}
+  .title .en{display:block;font-style:italic;font-size:.42em;color:var(--ink-soft);letter-spacing:0;margin-top:14px}
+  .dek{font-family:var(--serif);font-size:20px;font-style:italic;color:var(--ink-soft);max-width:640px;margin-top:26px;line-height:1.5}
+  .dateline{display:flex;flex-wrap:wrap;gap:28px;margin-top:34px;font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;color:var(--ink-soft)}
+  .dateline b{color:var(--ink);font-weight:500}
+
+  /* ---- section scaffold ---- */
+  section{padding:64px 0;border-bottom:1px solid var(--rule)}
+  .sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:38px}
+  .sec-num{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.1em;padding-top:6px}
+  .sec-title{font-family:var(--serif);font-size:32px;font-weight:400;letter-spacing:-.01em}
+  .sec-sub{font-family:var(--serif);font-style:italic;color:var(--ink-soft);font-size:16px;margin-left:auto;align-self:flex-end;text-align:right}
+  .lede{font-family:var(--serif);font-size:19px;line-height:1.62;max-width:660px;margin-bottom:34px}
+  .lede em{font-style:italic;color:var(--accent)}
+  .grid{display:grid;gap:40px}
+  @media(min-width:760px){.two{grid-template-columns:1fr 1fr}.side{grid-template-columns:1.4fr 1fr}}
+
+  /* ---- stat figures ---- */
+  .figrow{display:flex;flex-wrap:wrap;gap:44px;margin:8px 0 4px}
+  .fig .n{font-family:var(--serif);font-size:46px;line-height:1;letter-spacing:-.02em}
+  .fig .n small{font-size:.42em;color:var(--ink-soft);font-style:italic;margin-left:4px}
+  .fig .l{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--ink-soft);text-transform:uppercase;margin-top:10px}
+
+  /* ---- hour heatmap ---- */
+  .hours{display:grid;grid-template-columns:repeat(24,1fr);gap:3px;margin-top:6px}
+  .hours .cell{aspect-ratio:1;border-radius:2px;background:var(--accent);position:relative}
+  .hours .cell:hover::after{content:attr(data-t);position:absolute;bottom:130%;left:50%;transform:translateX(-50%);
+    background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:10px;padding:3px 6px;border-radius:3px;white-space:nowrap;z-index:5}
+  .hours-axis{display:grid;grid-template-columns:repeat(24,1fr);font-family:var(--mono);font-size:9.5px;color:var(--ink-faint);margin-top:7px}
+  .hours-axis span{text-align:center}
+
+  /* ---- weekday bars ---- */
+  .wk{display:flex;align-items:flex-end;gap:10px;height:120px;margin-top:8px}
+  .wk .col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+  .wk .bar{width:100%;background:var(--ink);border-radius:2px 2px 0 0;transition:.3s}
+  .wk .col.peak .bar{background:var(--accent)}
+  .wk .wd{font-family:var(--mono);font-size:10px;color:var(--ink-soft);margin-top:8px}
+
+  /* ---- proportion bar ---- */
+  .prop{display:flex;height:34px;border-radius:3px;overflow:hidden;margin:4px 0 22px;border:1px solid var(--rule)}
+  .prop span{position:relative}
+  .prop span:hover{filter:brightness(1.08)}
+  .legend{display:grid;gap:2px}
+  .legend .row{display:grid;grid-template-columns:14px 1fr auto auto;gap:12px;align-items:center;padding:7px 0;border-bottom:1px solid var(--rule);font-size:14px}
+  .legend .row:last-child{border-bottom:none}
+  .legend .sw{width:11px;height:11px;border-radius:2px}
+  .legend .nm{font-family:var(--mono);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .legend .ct{font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .legend .pc{font-family:var(--serif);font-size:15px;min-width:44px;text-align:right}
+
+  /* ---- rank list ---- */
+  .rank{display:grid;gap:0}
+  .rank .item{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;padding:9px 0;border-bottom:1px solid var(--rule);position:relative}
+  .rank .item:last-child{border-bottom:none}
+  .rank .k{font-family:var(--mono);font-size:13px;z-index:1}
+  .rank .v{font-family:var(--serif);font-size:15px;color:var(--ink-soft);z-index:1}
+  .rank .item .fillbar{position:absolute;left:0;bottom:0;height:100%;background:var(--accent-soft);border-radius:2px}
+  .colhead{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);padding-bottom:8px;border-bottom:1.5px solid var(--ink);margin-bottom:2px}
+
+  /* ---- friction (the mirror) ---- */
+  .fr-note{font-family:var(--serif);font-style:italic;color:var(--ink-soft);font-size:15px;margin:-14px 0 30px;padding-left:16px;border-left:2px solid var(--accent)}
+  .themes{display:grid;gap:30px}
+  @media(min-width:760px){.themes{grid-template-columns:1fr 1fr}}
+  .theme{}
+  .theme .th-h{display:flex;align-items:baseline;gap:10px;padding-bottom:10px;margin-bottom:14px;border-bottom:1.5px solid var(--ink)}
+  .theme .th-name{font-family:var(--serif);font-size:20px}
+  .theme .th-ct{font-family:var(--mono);font-size:11px;color:var(--accent);margin-left:auto}
+  .quote{font-family:var(--serif);font-size:15.5px;line-height:1.5;color:var(--ink);padding:9px 0 9px 18px;border-left:2px solid var(--rule);margin-bottom:11px;position:relative}
+  .quote:hover{border-left-color:var(--accent)}
+  .quote .src{display:block;font-family:var(--mono);font-size:10px;color:var(--ink-faint);letter-spacing:.05em;margin-top:5px;font-style:normal}
+
+  /* ---- task clusters ---- */
+  .clusters{display:grid;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:4px;overflow:hidden}
+  .cl{background:var(--paper);padding:16px 20px;display:grid;grid-template-columns:52px 1fr;gap:18px;align-items:center}
+  .cl .sz{font-family:var(--serif);font-size:30px;color:var(--accent);text-align:center;line-height:1}
+  .cl .sz small{display:block;font-family:var(--mono);font-size:8.5px;color:var(--ink-faint);letter-spacing:.1em;margin-top:3px}
+  .cl .rep{font-size:14px;line-height:1.5}
+  .cl .terms{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);margin-top:5px;letter-spacing:.02em}
+
+  /* ---- insights ---- */
+  .insights{counter-reset:ins;display:grid;gap:26px;max-width:760px}
+  .ins{display:grid;grid-template-columns:auto 1fr;gap:20px}
+  .ins::before{counter-increment:ins;content:counter(ins,decimal-leading-zero);font-family:var(--mono);font-size:13px;color:var(--accent);padding-top:5px}
+  .ins p{font-family:var(--serif);font-size:17px;line-height:1.58}
+  .ins b{font-weight:500;background:linear-gradient(transparent 62%,var(--accent-soft) 62%)}
+
+  footer{padding:50px 0 80px;font-family:var(--mono);font-size:11px;color:var(--ink-faint);letter-spacing:.05em;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+
+  /* ---- empty state ---- */
+  #empty{display:none;min-height:80vh;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:18px}
+  #empty.on{display:flex}
+  #empty h1{font-family:var(--serif);font-size:38px;font-weight:400}
+  #empty p{color:var(--ink-soft);font-family:var(--serif);font-style:italic}
+  #empty code{font-family:var(--mono);font-size:13px;background:var(--panel);padding:3px 8px;border-radius:3px;color:var(--accent)}
+  .drop{margin-top:20px;border:1.5px dashed var(--rule);border-radius:6px;padding:32px 48px;font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+</style>
+</head>
+<body>
+<div id="empty">
+  <div class="kicker" style="color:var(--accent)">AI USAGE MIRROR</div>
+  <h1>还没有可照的镜子</h1>
+  <p>请先运行审计,再由 skill 生成本页。</p>
+  <p style="font-style:normal;color:var(--ink)"><code>python3 scripts/mirror.py report</code></p>
+  <label class="drop">或把 digest.json 拖到这里 · 也可点击选择
+    <input id="file" type="file" accept="application/json" hidden></label>
+</div>
+
+<div id="app"></div>
+
+<script id="mirror-data" type="application/json">__MIRROR_DATA__</script>
+<script>
+const H=(t,a={},...c)=>{const e=document.createElement(t);for(const k in a){if(k==='style')e.style.cssText=a[k];else if(k==='html')e.innerHTML=a[k];else e.setAttribute(k,a[k]);}c.flat().forEach(x=>x!=null&&e.append(x.nodeType?x:document.createTextNode(x)));return e;};
+const nf=n=>n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'k':(''+n);
+const WD=['一','二','三','四','五','六','日'];
+const short=(s,n)=>s&&s.length>n?s.slice(0,n)+'…':s;
+
+// friction theming: quote -> theme by keyword
+const THEMES=[
+  {name:'审美与质感',hint:'太丑 · 不够精致 · 质感',re:/丑|精致|设计感|质感|纹路|颜色|色调|好看|动画|样式|视觉|画风/},
+  {name:'说人话',hint:'术语堆砌 · 文案不性感',re:/术语|用户友好|文案|黑话|技术用语|性感|value|proposition|表达/i},
+  {name:'做减法',hint:'信息过载 · 奥卡姆剃刀',re:/过载|精简|太多|剃刀|优雅|包袱|信息量|溢出|挤/},
+  {name:'真实与可溯源',hint:'拒绝 mock · 要证据链',re:/mock|溯源|证据|假|真实|召回|数据.*不|不.*数据/i},
+];
+function themeOf(q){for(const t of THEMES)if(t.re.test(q))return t.name;return '其它对齐';}
+
+function render(D){
+  const dg=D.digest||D, cl=D.clusters||{clusters:[]};
+  const m=dg.meta||{}, per=dg.per_source||{};
+  document.getElementById('empty').classList.remove('on');
+  const app=document.getElementById('app'); app.innerHTML='';
+  const wrap=(...x)=>H('div',{class:'wrap'},x);
+
+  /* masthead */
+  const totalReal=Object.values(per).reduce((a,b)=>a+b,0);
+  const tok=dg.output_tokens_est||{};
+  const totTok=Object.values(tok).reduce((a,b)=>a+b,0);
+  const delegated=Object.values(m.meta_sessions_skipped||{}).reduce((a,b)=>a+b,0);
+  app.append(H('div',{class:'masthead'},wrap(
+    H('div',{class:'kicker'},'AI Usage Mirror · 使用行为审计'),
+    H('h1',{class:'title'},'这面镜子里的你',H('span',{class:'en'},'a mirror of how you actually use AI')),
+    H('p',{class:'dek'},'不是你以为的用法,是记录里真实发生的。以下皆来自本地 Claude Code 与 Codex 的交互,只读、脱敏、未出本机。'),
+    H('div',{class:'dateline'},
+      H('span',{},'区间 ',H('b',{},(m.span||['','']).join(' – '))),
+      H('span',{},'亲手开的会话 ',H('b',{},nf(totalReal))),
+      H('span',{},'委派子 agent ',H('b',{},nf(delegated))),
+      H('span',{},'输出 tokens ',H('b',{},'≈'+nf(totTok))),
+    )
+  )));
+
+  const S=(num,title,sub,...body)=>H('section',{},wrap(
+    H('div',{class:'sec-head'},H('div',{class:'sec-num'},num),H('h2',{class:'sec-title'},title),sub&&H('div',{class:'sec-sub'},sub)),
+    ...body));
+
+  /* ① 作息 */
+  const bh=dg.temporal.by_hour, bw=dg.temporal.by_weekday, mxh=Math.max(...bh), mxw=Math.max(...bw);
+  const peakH=bh.indexOf(mxh), peakW=bw.indexOf(mxw);
+  app.append(S('01','作息','when you show up',
+    H('p',{class:'lede'},'你几乎不在清晨碰 AI。真正的高峰是 ',H('em',{},'午后 '+peakH+' 点'),',工作日绵密、',H('em',{},'周'+WD[peakW]+'最重'),',周末几近熄火。'),
+    H('div',{class:'grid two'},
+      H('div',{},H('div',{class:'colhead'},'一天 24 小时 · 用户消息密度'),
+        H('div',{class:'hours'},bh.map((v,i)=>H('div',{class:'cell','data-t':i+':00 · '+v,style:`opacity:${0.12+0.88*v/mxh}`}))),
+        H('div',{class:'hours-axis'},[0,6,12,18].map(h=>H('span',{style:`grid-column:${h+1}/span 6;text-align:left`},h+':00')))),
+      H('div',{},H('div',{class:'colhead'},'一周 · 周一→周日'),
+        H('div',{class:'wk'},bw.map((v,i)=>H('div',{class:'col'+(i===peakW?' peak':'')},
+          H('div',{class:'bar',style:`height:${Math.max(3,100*v/mxw)}%`}),H('div',{class:'wd'},WD[i])))))
+    )));
+
+  /* ② 模型 + token */
+  const md=dg.models||{}, mdE=Object.entries(md), mdTot=mdE.reduce((a,[,v])=>a+v,0);
+  const opus=Object.entries(md).filter(([k])=>/opus/.test(k)).reduce((a,[,v])=>a+v,0);
+  app.append(S('02','模型偏好','what you reach for',
+    H('p',{class:'lede'},'对 Claude 你 ',H('em',{},'顶配一把梭'),'——opus 占了近 '+Math.round(100*opus/(per['claude-code']?mdTot:mdTot))+'%,简单活也不降档;对 Codex 则在各代 gpt-5 之间试遍。'),
+    H('div',{class:'grid side'},
+      H('div',{},H('div',{class:'colhead'},'会话主导模型 · Top'),
+        H('div',{class:'rank'},mdE.sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,v])=>
+          H('div',{class:'item'},H('div',{class:'fillbar',style:`width:${100*v/mdTot}%`}),H('div',{class:'k'},k),H('div',{class:'v'},v))))),
+      H('div',{},H('div',{class:'colhead'},'输出量级'),
+        H('div',{class:'figrow',style:'flex-direction:column;gap:26px'},
+          ...Object.entries(tok).map(([k,v])=>H('div',{class:'fig'},H('div',{class:'n'},'≈',nf(v)),H('div',{class:'l'},k+' · output tokens')))),
+        H('p',{style:'font-family:var(--serif);font-style:italic;color:var(--ink-faint);font-size:13px;margin-top:20px;line-height:1.5'},'※ Codex 仅近期会话有 token 记录,实际更高;含 reasoning。'))
+    )));
+
+  /* ③ 项目 */
+  const pj=dg.projects||[], pjTop=pj.slice(0,6), COL=['#a23b1e','#c67a3e','#7a7a52','#4f6d5a','#8a8375','#b7ad98'];
+  const pjRest=1-pjTop.reduce((a,p)=>a+p.share,0);
+  app.append(S('03','战场','where the work lives',
+    H('p',{class:'lede'},pjTop[0]?H('em',{},pjTop[0].cwd.split('/').pop()+' 一家独大('+Math.round(pjTop[0].share*100)+'%)'):'','——其余是围绕它的卫星项目。'),
+    H('div',{class:'prop'},[...pjTop.map((p,i)=>H('span',{style:`flex:${p.share};background:${COL[i]}`,title:p.cwd})),
+      pjRest>0&&H('span',{style:`flex:${pjRest};background:#d8d0be`,title:'其它'})].filter(Boolean)),
+    H('div',{class:'legend'},[...pjTop.map((p,i)=>H('div',{class:'row'},
+      H('div',{class:'sw',style:`background:${COL[i]}`}),H('div',{class:'nm'},p.cwd),
+      H('div',{class:'ct'},p.sessions+' 会话'),H('div',{class:'pc'},Math.round(p.share*100)+'%'))),
+      pjRest>0.001&&H('div',{class:'row'},H('div',{class:'sw',style:'background:#d8d0be'}),H('div',{class:'nm'},'其它 '+(pj.length-6)+' 个'),H('div',{class:'ct'},''),H('div',{class:'pc'},Math.round(pjRest*100)+'%'))].filter(Boolean))
+  ));
+
+  /* ④ 常用 */
+  const cmd=dg.commands_top||[], ft=Object.entries(dg.edited_filetypes||{}), mxc=Math.max(...cmd.map(c=>c.n),1),mxf=Math.max(...ft.map(f=>f[1]),1);
+  app.append(S('04','手感','the muscle memory',
+    H('p',{class:'lede'},'你本质是 ',H('em',{},'读码 + 单文件 HTML 原型工'),':靠海量 grep/sed 在大文件里定位,heredoc 一次造文件,',H('em',{},'.html'),' 编辑量断层第一。'),
+    H('div',{class:'grid two'},
+      H('div',{},H('div',{class:'colhead'},'最常跑的命令'),
+        H('div',{class:'rank'},cmd.slice(0,12).map(c=>H('div',{class:'item'},H('div',{class:'fillbar',style:`width:${100*c.n/mxc}%`}),H('div',{class:'k'},c.cmd),H('div',{class:'v'},c.n))))),
+      H('div',{},H('div',{class:'colhead'},'最常改的文件类型'),
+        H('div',{class:'rank'},ft.sort((a,b)=>b[1]-a[1]).slice(0,12).map(([k,v])=>H('div',{class:'item'},H('div',{class:'fillbar',style:`width:${100*v/mxf}%`}),H('div',{class:'k'},k),H('div',{class:'v'},v)))))
+    )));
+
+  /* ⑤ 摩擦 —— the mirror */
+  const fr=dg.friction_candidates||[], groups={};
+  fr.forEach(f=>{const t=themeOf(f.quote);(groups[t]=groups[t]||[]).push(f);});
+  const order=['审美与质感','说人话','做减法','真实与可溯源','其它对齐'].filter(t=>groups[t]);
+  app.append(S('05','摩擦','what you kept correcting','—— 镜子把你的原话还给你',
+    H('p',{class:'lede'},'返工不在功能——功能你和 AI 都搞得定。你一轮轮盯的,是 ',H('em',{},'它像不像个成熟产品'),'。下面每一句都是你亲口说过的。'),
+    H('div',{class:'fr-note'},'共 '+fr.length+' 处纠正信号,按主题归拢。这是你时间最真实的黑洞,也最该前置进初始 prompt。'),
+    H('div',{class:'themes'},order.map(t=>H('div',{class:'theme'},
+      H('div',{class:'th-h'},H('div',{class:'th-name'},t),H('div',{class:'th-ct'},groups[t].length+' 处')),
+      ...groups[t].slice(0,5).map(f=>H('div',{class:'quote'},'「'+short(f.quote.replace(/\n/g,' '),68)+'」',
+        H('span',{class:'src'},f.source==='codex'?'CODEX':'CLAUDE CODE')))
+    )))
+  ));
+
+  /* ⑥ 任务簇 */
+  const cls=(cl.clusters||[]).filter(c=>{const r=(c.representative||'').replace(/\s/g,'');
+    return r.length>=16 && !/^(可以的|好的|继续|然后|对了|嗯|是的)/.test(r);}).slice(0,8);
+  app.append(S('06','复现任务','what recurs',cl.n_singletons?cl.n_singletons+' 个一次性任务未列':'',
+    H('p',{class:'lede'},'把 '+(cl.n_tasks||'')+' 条任务 prompt 语义聚类,浮现出你反复做的几类活:'),
+    H('div',{class:'clusters'},cls.map(c=>H('div',{class:'cl'},
+      H('div',{class:'sz'},c.size,H('small',{},'次')),
+      H('div',{},H('div',{class:'rep'},short(c.representative.replace(/\n/g,' '),90)),
+        H('div',{class:'terms'},(c.top_terms||[]).slice(0,5).join(' · '))))))
+  ));
+
+  /* ⑦ 洞察 */
+  const insights=(D.insights&&D.insights.length)?D.insights:[
+    '你 <b>'+ (per['claude-code']||0) +' 次亲手开 Claude,却委派了 '+delegated+' 次子 agent</b>——高度依赖编排。并行是好事,但你对"子 agent 到底干了啥"正逐渐失去感知:它们占了 token 和工具的大头,却不在你的直接视野里。',
+    '你的返工几乎全压在 <b>最后 10% 的审美与文案打磨</b>。功能你和 AI 都搞得定,但"像不像成熟产品"要靠你一轮轮盯。把 design-skill 调用、禁黑话、奥卡姆减法、禁 mock 写进<b>初始 prompt 模板</b>,能系统性省掉这一整类回合。',
+    '有几类求助反复出现(网关运维、评测语料自查、卡片布局),<b>值得沉淀成 memory 或 skill</b>——你已经有半套,差把它们真正 enforce 起来。',
+    '诚实的边界:作息只统计你 real 会话的消息,子 agent 的深夜运行不计入;Codex token 是低估;个别任务簇可能是短语误合。<b>这面镜子不假装完美,它只是不撒谎。</b>'
+  ];
+  app.append(S('07','镜中所见','the reflection',
+    H('div',{class:'insights'},insights.map(t=>H('div',{class:'ins'},H('p',{html:t}))))
+  ));
+
+  app.append(H('footer',{},wrap(H('div',{},'生成于 '+(m.generated||'—')+' · ai-usage-mirror'),
+    H('div',{},'本地只读 · 脱敏 · 未出本机'))));
+}
+
+/* boot */
+(function(){
+  let data=null;
+  const raw=document.getElementById('mirror-data').textContent.trim();
+  try{ if(raw && raw!=='__MIRROR_'+'DATA__') data=JSON.parse(raw);}catch(e){}
+  if(data && (data.digest||data.temporal)) render(data);
+  else{
+    document.getElementById('empty').classList.add('on');
+    const inp=document.getElementById('file');
+    document.querySelector('.drop').onclick=()=>inp.click();
+    inp.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
+      r.onload=()=>{try{const j=JSON.parse(r.result);render(j.digest?j:{digest:j,clusters:{clusters:[]}});}catch(err){alert('解析失败')}};r.readAsText(f);};
+    ['dragover','drop'].forEach(ev=>document.body.addEventListener(ev,e=>e.preventDefault()));
+    document.body.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(!f)return;const r=new FileReader();
+      r.onload=()=>{try{const j=JSON.parse(r.result);render(j.digest?j:{digest:j,clusters:{clusters:[]}});}catch(err){alert('解析失败')}};r.readAsText(f);});
+  }
+})();
+</script>
+</body>
+</html>
