@@ -57,9 +57,19 @@ python3 scripts/mirror.py ingest        # parse sources into SQLite (incremental
 python3 scripts/mirror.py digest --json # the compact aggregate the report is built from
 python3 scripts/mirror.py cluster --json# recurring task-type clusters
 python3 scripts/mirror.py report        # render the report page and open it
+python3 scripts/mirror.py profile       # distill your coding-habit profile to markdown
 ```
 
 The whole pipeline runs in ~2s cold over hundreds of MB of transcripts, and the digest that summarizes it all is ~30 KB.
+
+## Coding-habit profile
+
+Beyond *how* you use AI, `mirror profile` distills *what kind of coder you are* into a two‑tier markdown (`.state/coding-profile.md`), borrowing a MECE category‑tree method: a small set of orthogonal habit dimensions, with tool/model/project kept as cross‑cutting slicers rather than dimensions.
+
+- **Tier A — fingerprint (descriptive):** your **stack** (packages the AI actually installed for you, libraries you name in prompts, package managers, languages), **prompting style** (instruction length mix, acceptance‑criteria rate, discuss‑first tendency), **verification discipline** (test / git / typecheck / build command mix, test‑to‑edit ratio), and your recurring task archetypes.
+- **Tier B — memory‑ready candidate rules (prescriptive):** the frictions you hit *repeatedly*, themed and turned into front‑loadable rules you can paste into your own memory or agent instructions — suggestive, not accusatory.
+
+`mirror profile --json` emits the deterministic summary for an LLM to synthesize the enriched write‑up; plain `mirror profile` renders a deterministic baseline itself. Extraction adds one column (`tool_call.pkgs`) — bump to schema v2, auto‑migrated via `ingest --full`.
 
 ## The report
 

@@ -86,7 +86,7 @@ def parse(path):
                         sess_out = max(sess_out, v)
             elif t == 'response_item' and p.get('type') == 'function_call':
                 name = p.get('name', '?')
-                cmd_key = workdir = None
+                cmd_key = workdir = pkgs = None
                 args = p.get('arguments')
                 if isinstance(args, str):
                     try:
@@ -109,8 +109,9 @@ def parse(path):
                                 if pr:
                                     hints[pr] += 1
                             cmd_key = F.command_key(cmd)
+                            pkgs = ','.join(F.install_pkgs(cmd)) or None
                 tool_calls.append({'after_seq': last_asst_seq, 'tool': 'codex:' + name,
-                                   'cmd_key': cmd_key, 'file_ext': None, 'workdir': workdir})
+                                   'cmd_key': cmd_key, 'file_ext': None, 'workdir': workdir, 'pkgs': pkgs})
 
     if n_user == 0 and n_asst == 0:
         return None

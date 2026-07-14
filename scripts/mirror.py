@@ -11,10 +11,12 @@ from store import Store
 from sources import SOURCES
 import aggregate
 import cluster
+import profile as profile_mod
 
 STATE_DIR = os.path.normpath(os.path.join(HERE, '..', '.state'))
 DB_PATH = os.path.join(STATE_DIR, 'mirror.db')
 DIGEST_PATH = os.path.join(STATE_DIR, 'digest.json')
+PROFILE_MD = os.path.join(STATE_DIR, 'coding-profile.md')
 
 # Semantic exit codes (ARCHITECTURE.md §8)
 OK, HEALTH_FAIL, EMPTY, CORRUPT, VERSION_MISMATCH = 0, 1, 3, 5, 6
@@ -95,10 +97,11 @@ def cmd_report(args):
     guard(st)
     digest = aggregate.build_digest(st.db)
     clusters = cluster.cluster_tasks(st.db, use_embeddings=args.embeddings)
+    prof = profile_mod.build_profile(st.db)
     st.close()
     import datetime
     digest.setdefault('meta', {})['generated'] = datetime.datetime.now().isoformat(timespec='minutes')
-    data = json.dumps({'digest': digest, 'clusters': clusters}, ensure_ascii=False)
+    data = json.dumps({'digest': digest, 'clusters': clusters, 'profile': prof}, ensure_ascii=False)
     tpl_path = os.path.join(HERE, 'report_template.html')
     with open(tpl_path, encoding='utf-8') as fh:
         html = fh.read().replace('__MIRROR_DATA__', data)
@@ -110,6 +113,28 @@ def cmd_report(args):
     if not args.no_open:                       # auto-open by default (the report is meant to be reviewed)
         import subprocess
         subprocess.run(['open', out], check=False)
+
+
+def cmd_profile(args):
+    st = open_store()
+    guard(st)
+    prof = profile_mod.build_profile(st.db)
+    clusters = cluster.cluster_tasks(st.db, use_embeddings=args.embeddings)
+    digest = aggregate.build_digest(st.db)
+    st.close()
+    if args.json:                                # LLM path: consume digest, author the enriched md itself
+        print(json.dumps({'profile': prof, 'clusters': clusters,
+                           'span': digest.get('meta', {}).get('span')},
+                         ensure_ascii=False, indent=2 if args.pretty else None))
+        return
+    import datetime
+    gen = datetime.datetime.now().isoformat(timespec='minutes')
+    md = profile_mod.render_md(prof, clusters, digest, gen)
+    out = os.path.expanduser(args.out or PROFILE_MD)
+    with open(out, 'w', encoding='utf-8') as fh:
+        fh.write(md)
+    log(f"[profile] {len(md.encode('utf-8'))/1024:.1f} KB -> {out}")
+    print(out)
 
 
 def cmd_cluster(args):
@@ -166,6 +191,8 @@ CAPABILITIES = {
         {'cmd': 'ingest [--full]', 'purpose': 'parse sources into SQLite (incremental)', 'json': True},
         {'cmd': 'digest [--pretty]', 'purpose': 'rebuild the aggregate digest for the report', 'json': True},
         {'cmd': 'cluster [--embeddings]', 'purpose': 'recurring task-type clusters (②repeat)', 'json': True},
+        {'cmd': 'profile [--json] [--out PATH]', 'purpose': 'distill coding-habit profile to markdown '
+         '(--json feeds LLM synthesis; default writes .state/coding-profile.md)', 'json': True},
         {'cmd': 'search <q> [--limit]', 'purpose': 'FTS5 lexical search over user prompts', 'json': True},
         {'cmd': 'pack <q> [--max-tokens]', 'purpose': 'token-budgeted cited excerpts for a topic', 'json': True},
         {'cmd': 'doctor', 'purpose': 'health: integrity, coverage, fts, safe-to-gc', 'json': True},
@@ -249,6 +276,12 @@ def main():
     pr.add_argument('--embeddings', action='store_true')
     pr.add_argument('--no-open', action='store_true', help='do not auto-open the page (default: opens it)')
     pr.set_defaults(fn=cmd_report)
+    ppf = sub.add_parser('profile', help='distill coding-habit profile to a two-tier markdown')
+    ppf.add_argument('--json', action='store_true', help='emit profile digest to stdout (LLM synthesis)')
+    ppf.add_argument('--out', default=None, help='markdown output path (default: .state/coding-profile.md)')
+    ppf.add_argument('--embeddings', action='store_true')
+    ppf.add_argument('--pretty', action='store_true')
+    ppf.set_defaults(fn=cmd_profile)
     pc = sub.add_parser('cluster', help='cluster task prompts into recurring task types')
     pc.add_argument('--embeddings', action='store_true', help='use local MiniLM (opt-in; else TF-IDF)')
     pc.add_argument('--threshold', type=float, default=None)

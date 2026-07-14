@@ -269,6 +269,70 @@ function render(D){
     H('div',{class:'insights'},insights.map(t=>H('div',{class:'ins'},H('p',{html:t}))))
   ));
 
+  /* ===== 副刊 · 编码指纹 (coding profile) ===== */
+  const pf=D.profile;
+  if(pf){
+    app.append(H('div',{class:'masthead',style:'border-top:2px solid var(--ink);padding-top:72px'},wrap(
+      H('div',{class:'kicker'},'副刊 · Coding Fingerprint'),
+      H('h1',{class:'title',style:'font-size:clamp(38px,5.4vw,64px)'},'你是个怎样的 coder',
+        H('span',{class:'en'},'not how you use AI — what kind of coder you are')),
+      H('p',{class:'dek'},'从同一批记录里再蒸馏一层:你的技术栈、表达风格、验证纪律,以及最该固化成规则的反复摩擦。')
+    )));
+
+    /* 08 技术栈 */
+    const sf=pf.stack_fingerprint||{}, pk=sf.packages_installed||[], lb=sf.libs_mentioned||[];
+    const mxpk=Math.max(...pk.map(x=>x.n),1), mxlb=Math.max(...lb.map(x=>x.n),1), mgr=sf.package_managers||{};
+    app.append(S('08','技术栈','the stack you reach for',
+      H('p',{class:'lede'},'AI 替你装的包 + 你 prompt 里点名的库,拼出你的 ',H('em',{},'实际技术栈'),'——不是简历上的,是手上的。'),
+      H('div',{class:'grid two'},
+        H('div',{},H('div',{class:'colhead'},'AI 实际安装的包 · 含子 agent'),
+          pk.length?H('div',{class:'rank'},pk.slice(0,12).map(x=>H('div',{class:'item'},H('div',{class:'fillbar',style:`width:${100*x.n/mxpk}%`}),H('div',{class:'k'},x.name),H('div',{class:'v'},x.n)))):H('p',{style:'color:var(--ink-faint);font-style:italic'},'—')),
+        H('div',{},H('div',{class:'colhead'},'你 prompt 里点名的库/框架'),
+          lb.length?H('div',{class:'rank'},lb.slice(0,12).map(x=>H('div',{class:'item'},H('div',{class:'fillbar',style:`width:${100*x.n/mxlb}%`}),H('div',{class:'k'},x.name),H('div',{class:'v'},x.n)))):H('p',{style:'color:var(--ink-faint);font-style:italic'},'—'))
+      ),
+      Object.keys(mgr).length?H('p',{style:'font-family:var(--mono);font-size:12px;color:var(--ink-soft);margin-top:24px;letter-spacing:.03em'},'包管理器 · '+Object.entries(mgr).sort((a,b)=>b[1]-a[1]).map(([k,v])=>k+' ×'+v).join('   ·   ')):null
+    ));
+
+    /* 09 表达 */
+    const ps=pf.prompting_style||{}, lm=ps.length_mix||{};
+    const lmOrder=['terse (<40)','normal (40-400)','detailed (>400)'], lmLbl={'terse (<40)':'简短 <40','normal (40-400)':'常规 40–400','detailed (>400)':'详尽 >400'};
+    const lmTot=lmOrder.reduce((a,k)=>a+(lm[k]||0),0)||1, LMC=['#a23b1e','#7a7a52','#4f6d5a'];
+    app.append(S('09','表达','how you instruct',
+      H('p',{class:'lede'},'你的指令中位仅 ',H('em',{},ps.median_chars+' 字符'),',',Math.round((ps.cjk_share||0)*100)+'% 中文,',H('em',{},Math.round((ps.acceptance_rate||0)*100)+'% 带验收/约束'),'——多是短促祈使句,细节留给来回。'),
+      H('div',{class:'figrow'},
+        H('div',{class:'fig'},H('div',{class:'n'},nf(ps.n_prompts||0)),H('div',{class:'l'},'直接指令条数')),
+        H('div',{class:'fig'},H('div',{class:'n'},ps.median_chars,H('small',{},'字符')),H('div',{class:'l'},'中位长度')),
+        H('div',{class:'fig'},H('div',{class:'n'},Math.round((ps.acceptance_rate||0)*100),H('small',{},'%')),H('div',{class:'l'},'带验收/约束')),
+        H('div',{class:'fig'},H('div',{class:'n'},Math.round((ps.discuss_first_rate||0)*100),H('small',{},'%')),H('div',{class:'l'},'先讨论后写'))
+      ),
+      H('div',{class:'colhead',style:'margin-top:36px'},'指令长度分布'),
+      H('div',{class:'prop'},lmOrder.map((k,i)=>H('span',{style:`flex:${(lm[k]||0)/lmTot};background:${LMC[i]}`,title:lmLbl[k]}))),
+      H('div',{class:'legend'},lmOrder.map((k,i)=>H('div',{class:'row'},H('div',{class:'sw',style:`background:${LMC[i]}`}),H('div',{class:'nm'},lmLbl[k]),H('div',{class:'ct'},(lm[k]||0)+' 条'),H('div',{class:'pc'},Math.round(100*(lm[k]||0)/lmTot)+'%'))))
+    ));
+
+    /* 10 验证纪律 */
+    const vh=pf.verification_habits||{}, vb=vh.buckets||{}, vbLbl={test:'测试',git:'git',typecheck:'类型 / lint',build:'构建 / 运行'};
+    const vbE=Object.entries(vb).sort((a,b)=>b[1]-a[1]), mxvb=Math.max(...vbE.map(x=>x[1]),1);
+    app.append(S('10','验证','the discipline',
+      H('p',{class:'lede'},'编辑 ',H('em',{},nf(vh.edits||0)+' 次'),',git commit 仅 '+(vh.commits||0)+' 次,test:edit 比 ',H('em',{},(vh.test_to_edit_ratio==null?'—':vh.test_to_edit_ratio)),'——你验证靠 ',H('em',{},'跑起来看'),',不是靠测试套。'),
+      H('div',{class:'grid side'},
+        H('div',{},H('div',{class:'colhead'},'验证类命令 · 分桶'),
+          vbE.length?H('div',{class:'rank'},vbE.map(([k,v])=>H('div',{class:'item'},H('div',{class:'fillbar',style:`width:${100*v/mxvb}%`}),H('div',{class:'k'},vbLbl[k]||k),H('div',{class:'v'},v)))):H('p',{style:'color:var(--ink-faint);font-style:italic'},'—')),
+        H('div',{},H('div',{class:'figrow',style:'flex-direction:column;gap:22px'},
+          H('div',{class:'fig'},H('div',{class:'n'},nf(vh.commits||0)),H('div',{class:'l'},'git commit')),
+          H('div',{class:'fig'},H('div',{class:'n'},vh.test_to_edit_ratio==null?'—':vh.test_to_edit_ratio),H('div',{class:'l'},'test : edit 比'))),
+          H('p',{style:'font-family:var(--serif);font-style:italic;color:var(--ink-faint);font-size:13px;margin-top:20px;line-height:1.5'},'※ cmd_key 只留前 2 token,npm run * 会粗归构建桶;直接跑的 pytest / vitest / playwright / tsc / git 精确。'))
+      )));
+
+    /* 11 该沉淀的规则 (Tier B) */
+    const themes=(pf.friction_themes||[]).filter(t=>t.theme!=='其他'&&t.n>=2);
+    if(themes.length) app.append(S('11','该沉淀的规则','memory-ready','—— 建议型,不是质问型',
+      H('p',{class:'lede'},'下面每条都源自 ',H('em',{},'反复出现的摩擦'),'。前置进初始 prompt,就能省掉后面一整类返工回合。确认后并入你的 memory 或 CLAUDE.md。'),
+      H('div',{class:'insights'},themes.map(t=>H('div',{class:'ins'},
+        H('p',{html:'<b>'+t.theme+'</b> · 命中 '+t.n+' 次 —— 把这条写死进初始约束'+(t.quotes&&t.quotes[0]?'。如你原话:「'+short(t.quotes[0].replace(/\s+/g,' '),52)+'」':'')}))))
+    ));
+  }
+
   app.append(H('footer',{},wrap(H('div',{},'生成于 '+(m.generated||'—')+' · ai-usage-mirror'),
     H('div',{},'本地只读 · 脱敏 · 未出本机'))));
 }

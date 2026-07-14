@@ -2,9 +2,11 @@
 name: ai-usage-mirror
 description: >-
   照一面"AI 使用行为的镜子":读取本地 Claude Code + Codex 的真实交互记录,归一进 SQLite,
-  产出你的 AI 使用习惯画像、常用代码/任务、协作摩擦点、重复求助。当用户说"分析我的 AI 使用习惯 /
+  产出你的 AI 使用习惯画像、常用代码/任务、协作摩擦点、重复求助;还能蒸馏你的**编码习惯**
+  (技术栈指纹 / 需求表达风格 / 验证纪律 / 反复摩擦)成一份两层 markdown。当用户说"分析我的 AI 使用习惯 /
   AI 使用报告 / 我常用什么任务 / 我常让 AI 干什么 / 复盘我怎么用 AI / my AI usage habits /
-  ai usage mirror / 我的 AI 使用画像"时触发。本地只读、零上传。
+  ai usage mirror / 我的 AI 使用画像 / 沉淀我的编码习惯 / 我的编码指纹 / 我的技术栈偏好 /
+  coding profile"时触发。本地只读、零上传。
 ---
 
 # ai-usage-mirror
@@ -47,6 +49,23 @@ digest 是**分层**的,解读时必须区分:
 ③ **协作摩擦** — 从 `friction_candidates` 归纳返工主题(如"审美打磨""说人话/去黑话"),给**可操作建议**(如把 design-skill 调用 + 禁术语写进初始 prompt 以省返工回合)。
 ④ **重复求助** — 反复出现的簇 → 建议**沉淀成 `memory/` 或 skill**(呼应用户的 memory/experience-library 体系)。
 ⑤ **反思洞察** — 反直觉的点、效率黑洞、值得改的习惯。诚实,不迎合;必要时点名残留噪声(个别簇可能是短语误合)。
+
+## 编码习惯沉淀(coding-profile 流程)
+当用户想**沉淀/固化编码习惯**、要**技术栈指纹 / 编码画像 / memory-ready 规则**时,走这条(与五段报告正交,可单独跑):
+
+1. `ingest`(增量,同上;若 exit 6 则 `ingest --full` 做 schema v2 迁移,约 2s)。
+2. **取 profile 摘要**:`python3 scripts/mirror.py profile --json` → stdout 出 `{profile, clusters, span}`(只有它进 context)。四组维度:
+   - `prompting_style` — 指令粒度/长度分布/中英比/带验收率/先讨论倾向(仅 real,你的直接投入)。
+   - `stack_fingerprint` — `packages_installed`(AI 实际装的,含子 agent)、`libs_mentioned`(你 prompt 点名的)、`package_managers`、`languages`。
+   - `verification_habits` — test/git/typecheck/build 分桶 + commit 数 + test:edit 比。
+   - `friction_themes` — 摩擦引用粗聚成主题桶(审美/去黑话/禁 mock/对齐/信息过载/返工/其他)。
+3. **我合成两层 md 并落盘**(这步是判断活,归我):
+   - **Tier A 画像**(描述型):基于四组维度写"你作为 coder 的指纹",技术栈簇由我语义归并(如把 `next`/`next.js` 合一)。
+   - **Tier B 候选规则**(memory-ready):把 `friction_themes` 里 n≥2 的主题**改写成精准、可执行的规则**(建议型不是质问型,呼应你 xlsx 的"缺口 Tips"姿态),每条给证据引用。
+   - 直接把最终 md 用 Write 写到 `.state/coding-profile.md`(或用户指定路径)。若不需要我增强,`mirror profile`(不带 `--json`)会渲染一份确定性兜底 md。
+4. **收尾**:把 Tier B 的候选规则逐条念给用户,**问是否并入 `memory/` 或 `CLAUDE.md`**——不自动写这两处(尊重用户视 CLAUDE.md 洁净为关键)。
+
+> 读数纪律同上:`prompting_style`/`friction_themes` 是 real(你的直接表达);`stack_fingerprint`/`verification_habits` 含 meta(子 agent 替你干的活)。`cmd_key` 只留前 2 token,`npm run *` 粗归 build 桶——直接跑的 pytest/vitest/playwright/tsc/git commit 才精确。
 
 ## 交付原则
 - 默认 **on-demand**(本 skill 唤起),**不装自动 hook**。

@@ -88,7 +88,7 @@ def parse(path):
                     if isinstance(b, dict) and b.get('type') == 'tool_use':
                         name = b.get('name', '?')
                         inp = b.get('input') or {}
-                        cmd_key = file_ext = workdir = None
+                        cmd_key = file_ext = workdir = pkgs = None
                         if isinstance(inp, dict):
                             if name == 'Bash' and inp.get('command'):
                                 cmd = inp['command']
@@ -97,14 +97,15 @@ def parse(path):
                                     if pr:
                                         hints[pr] += 1
                                 cmd_key = F.command_key(cmd)
+                                pkgs = ','.join(F.install_pkgs(cmd)) or None
                             if name in ('Edit', 'Write', 'NotebookEdit') and inp.get('file_path'):
                                 fp = inp['file_path']
                                 file_ext = os.path.splitext(fp)[1].lower() or None
                                 pr = F.project_root(fp)
                                 if pr:
                                     hints[pr] += 1
-                        tool_calls.append({'after_seq': last_asst_seq, 'tool': name,
-                                           'cmd_key': cmd_key, 'file_ext': file_ext, 'workdir': workdir})
+                        tool_calls.append({'after_seq': last_asst_seq, 'tool': name, 'cmd_key': cmd_key,
+                                           'file_ext': file_ext, 'workdir': workdir, 'pkgs': pkgs})
                 n_asst += 1
                 prev_asst = True
 

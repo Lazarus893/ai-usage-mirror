@@ -126,3 +126,127 @@ def parse_ts(s):
         return datetime.datetime.fromisoformat(s.replace('Z', '+00:00')).astimezone()
     except Exception:
         return None
+
+# ---------- coding-profile signals (deterministic; LLM does the naming/judgment later) ----------
+# Package-install command heads -> we keep the TARGET package names (command_key drops them).
+_INSTALL = re.compile(
+    r'\b(?:'
+    r'npm\s+(?:i|install|add)|pnpm\s+(?:add|install|i)|yarn\s+add|bun\s+(?:add|install)|'
+    r'(?:python[0-9.]*\s+-m\s+)?pip[0-9]?\s+install|uv\s+(?:add|pip\s+install)|poetry\s+add|'
+    r'cargo\s+add|go\s+(?:get|install)|brew\s+install|gem\s+install'
+    r')\s+(?P<rest>[^\n&|;]+)', re.I)
+
+
+def _strip_version(tok):
+    """Drop a version specifier from a package token, keeping scoped names intact."""
+    if tok.startswith('@'):                          # scoped: @scope/name[@ver]
+        at = tok.find('@', 1)
+        return tok[:at] if at != -1 else tok
+    return re.split(r'@|==|~=|>=|<=|>|<|\[', tok, 1)[0]
+
+
+def install_pkgs(cmd):
+    """Package targets from an install command. Deterministic; drops flags/versions/dupes."""
+    if not cmd:
+        return []
+    out, seen = [], set()
+    for m in _INSTALL.finditer(cmd):
+        for tok in m.group('rest').split():
+            if tok.startswith('-') or tok in ('install', 'add', 'i', 'pip', 'get'):
+                continue                             # flags / doubled verbs
+            p = _strip_version(tok).strip('"\'`,').lower()
+            if not p or not re.search(r'[a-z]', p) or len(p) > 60 or p in seen:
+                continue
+            if any(c in p for c in '$=;`{}()*') or p[0] in '~./':   # shell noise / paths / vars
+                continue
+            seen.add(p)
+            out.append(p)
+    return out
+
+
+# Package managers we recognize as a command head (filters compound-command noise like `mkdir`).
+KNOWN_MGR = {'npm', 'pnpm', 'yarn', 'bun', 'npx', 'pip', 'pip3', 'uv', 'poetry',
+             'cargo', 'go', 'brew', 'gem'}
+
+
+def mgr_head(cmd_key):
+    """The package-manager head of a cmd_key, or None (rejects mkdir/ssh/… noise)."""
+    if not cmd_key:
+        return None
+    head = cmd_key.split()[0].lower()
+    return head if head in KNOWN_MGR else None
+
+
+# Curated library lexicon (aligned to the user's stack + common web/py). Prompt-mention signal.
+LIB_LEXICON = {
+    'react', 'next.js', 'next', 'vue', 'svelte', 'solid', 'angular', 'astro',
+    'tailwind', 'shadcn', 'radix', 'chakra', 'mui', 'assistant-ui',
+    'vite', 'webpack', 'turbopack', 'esbuild', 'rollup', 'turborepo',
+    'framer motion', 'framer-motion', 'gsap', 'anime.js', 'animejs', 'three.js', 'three',
+    'd3', 'p5.js', 'p5', 'recharts', 'visx',
+    'lexical', 'codemirror', 'tiptap', 'prosemirror',
+    'bullmq', 'redis', 'postgres', 'drizzle', 'prisma', 'sqlite', 'mongodb', 'supabase',
+    'trpc', 'better auth', 'better-auth', 'clerk', 'nextauth', 'zod', 'zustand', 'jotai',
+    'redux', 'react-query', 'tanstack', 'playwright', 'vitest', 'jest', 'cypress',
+    'biome', 'eslint', 'prettier', 'ruff', 'mypy',
+    'pi-ai', 'langchain', 'anthropic', 'openai', 'ollama',
+    'fastapi', 'flask', 'django', 'express', 'hono', 'fastify',
+    'pandas', 'numpy', 'pytorch', 'tensorflow', 'onnxruntime', 'fastembed', 'openpyxl',
+    'docker', 'kubernetes', 'terraform',
+}
+_LIB_RE = re.compile(
+    r'(?<![\w.-])(' + '|'.join(sorted((re.escape(l) for l in LIB_LEXICON), key=len, reverse=True)) +
+    r')(?![\w.-])', re.I)
+# Fold near-duplicate spellings into one canonical name.
+LIB_ALIAS = {'next': 'next.js', 'three': 'three.js', 'animejs': 'anime.js', 'p5': 'p5.js',
+             'framer-motion': 'framer motion', 'better-auth': 'better auth'}
+
+
+def libs_in_text(text):
+    """Canonical library names mentioned in a user prompt (deduped, aliases folded)."""
+    if not text:
+        return []
+    out, seen = [], set()
+    for m in _LIB_RE.finditer(text.lower()):
+        v = LIB_ALIAS.get(m.group(1), m.group(1))
+        if v not in seen:
+            seen.add(v)
+            out.append(v)
+    return out
+
+
+# Verification/quality-habit buckets over cmd_key (which is only the first 2 tokens — coarse).
+_VERIF = [
+    ('test', re.compile(r'\b(pytest|vitest|jest|cypress|playwright|unittest|npm\s+test|'
+                        r'yarn\s+test|pnpm\s+test|go\s+test|cargo\s+test)', re.I)),
+    ('git', re.compile(r'^git\b', re.I)),
+    ('typecheck', re.compile(r'\b(tsc|mypy|pyright|eslint|biome|ruff|flake8|prettier)\b', re.I)),
+    ('build', re.compile(r'\b(make|webpack|vite|next|cargo\s+build|uvicorn|npm\s+run)\b', re.I)),
+]
+
+
+def verif_bucket(cmd_key):
+    """Map a command head to a quality-habit bucket, or None. Coarse (cmd_key is truncated)."""
+    if not cmd_key:
+        return None
+    for name, rx in _VERIF:
+        if rx.search(cmd_key):
+            return name
+    return None
+
+
+# Prompting-style markers (operate on user message text).
+_ACCEPTANCE = re.compile(
+    r'(验收|确保|必须|别忘|不要|别改|保持|跑通|测一下|跑一下测试|通过测试|符合|不能|'
+    r'acceptance|make sure|must\b|do ?n.?t\b|ensure|verify that|should not)', re.I)
+_DISCUSS = re.compile(
+    r'(先讨论|先别写|别急着写|先说思路|先给方案|先聊|讨论清楚|先不要动手|先出.{0,4}计划|'
+    r'do ?n.?t code yet|let.?s discuss|before you (write|code|start))', re.I)
+
+
+def has_acceptance(text):
+    return bool(text and _ACCEPTANCE.search(text))
+
+
+def wants_discussion(text):
+    return bool(text and _DISCUSS.search(text))

@@ -1,7 +1,7 @@
 """SQLite canonical store + incremental ingest (ARCHITECTURE.md §3, §4). Read-only on sources."""
 import os, sqlite3, hashlib, datetime
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"   # v2: tool_call.pkgs (install targets, for stack fingerprint)
 
 _DDL = """
 CREATE TABLE IF NOT EXISTS session (
@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS message (
 );
 CREATE TABLE IF NOT EXISTS tool_call (
   id INTEGER PRIMARY KEY, session_id TEXT NOT NULL REFERENCES session(id) ON DELETE CASCADE,
-  after_seq INTEGER, tool TEXT NOT NULL, cmd_key TEXT, file_ext TEXT, workdir TEXT
+  after_seq INTEGER, tool TEXT NOT NULL, cmd_key TEXT, file_ext TEXT, workdir TEXT,
+  pkgs TEXT   -- comma-joined install targets (npm/pip/uv/... add), NULL if none
 );
 CREATE TABLE IF NOT EXISTS prompt_vec (
   message_id INTEGER PRIMARY KEY REFERENCES message(id) ON DELETE CASCADE, vec BLOB
@@ -153,9 +154,10 @@ class Store:
                  for m in s['messages']])
         if s['tool_calls']:
             self.db.executemany(
-                "INSERT INTO tool_call(session_id,after_seq,tool,cmd_key,file_ext,workdir) "
-                "VALUES(?,?,?,?,?,?)",
-                [(s['id'], t['after_seq'], t['tool'], t['cmd_key'], t['file_ext'], t['workdir'])
+                "INSERT INTO tool_call(session_id,after_seq,tool,cmd_key,file_ext,workdir,pkgs) "
+                "VALUES(?,?,?,?,?,?,?)",
+                [(s['id'], t['after_seq'], t['tool'], t['cmd_key'], t['file_ext'], t['workdir'],
+                  t.get('pkgs'))
                  for t in s['tool_calls']])
 
     # ---- FTS5 (derived asset, rebuilt from message; fail-open) ----
