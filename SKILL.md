@@ -75,7 +75,10 @@ digest 是**分层**的,解读时必须区分:
    - `terms` —— 领域高频专名(项目名 / CamelCase 库 / 缩写 / 高频中文)→ Handy **词典 hotword**(改 ASR/refinement 对专名的识别)。这是「上下文/字面命中」通道,宁缺毋滥。
    - `facts` —— 从真实使用史归纳的**结构化记忆**(topic + fact):`技术栈`(合并 libs_mentioned+packages_installed,分组:前端/编辑器/数据后端/测试/AI-Agent/桌面基建/数据处理)、`语言`(主力扩展名)、`项目`(常做仓库)、`协作风格`(中文/简短/带验收/先讨论)→ Handy **memory_facts**(带各自 topic)。给 refinement 定调、给 VP c-mode「项目 Prompt」policy 一份**有数据支撑**的工程约束先验(替代原来硬编码 demo seed)。
    - `topics` —— v1 legacy 项目占比句,仅为老 Handy 兼容保留;新 Handy 有 `facts` 时忽略。
-3. **Handy 侧落库**:元宝输入法 Debug 设置里「导入 AI 使用画像」按钮 → `commands/usage_profile.rs::import_usage_profile` 幂等导入(terms→dictionary、facts→memory_facts,按文本去重可反复导)。
+3. **Handy 侧落库**(两条路并存,都走 `commands/usage_profile.rs`,幂等,terms→dictionary、facts→memory_facts,按文本去重可反复导):
+   - **零点击(推荐)**:Handy 启动时 `auto_import_if_newer` 自动检测默认工件,只在工件 mtime **比上次导入更新**时才静默重导(水位记在 app 数据目录 `usage_profile_import.json`)。导入过就不再和用户手动增删较劲;想强制重导 = 重跑本步 export(mtime 自然前进)。失败绝不拦启动。
+   - **手动**:设置页「上下文」tab 顶部「导入 AI 使用画像」按钮 → `import_usage_profile`,立刻导入 + 回显统计 + 刷新词典/记忆列表。
+   > 于是「跑 skill 生成工件 → 下次启动 Handy 自动吃」成零点击闭环;按钮留作"我现在就要导 + 看结果"。
 > 采信阈值分来源:AI 实际**安装**的包 ≥1 次即采信(装了就用),只在 prompt **提到**的库要 ≥2 次。技术栈 fact 优先(对 VP 最有用),协作风格垫底;总数 ≤14 条留余量给用户自加记忆。
 
 ## 交付原则
