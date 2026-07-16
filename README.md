@@ -58,6 +58,7 @@ python3 scripts/mirror.py digest --json # the compact aggregate the report is bu
 python3 scripts/mirror.py cluster --json# recurring task-type clusters
 python3 scripts/mirror.py report        # render the report page and open it
 python3 scripts/mirror.py profile       # distill your coding-habit profile to markdown
+python3 scripts/export_input_profile.py # distill a context artifact for the Handy input method
 ```
 
 The whole pipeline runs in ~2s cold over hundreds of MB of transcripts, and the digest that summarizes it all is ~30 KB.
@@ -70,6 +71,22 @@ Beyond *how* you use AI, `mirror profile` distills *what kind of coder you are* 
 - **Tier B — memory‑ready candidate rules (prescriptive):** the frictions you hit *repeatedly*, themed and turned into front‑loadable rules you can paste into your own memory or agent instructions — suggestive, not accusatory.
 
 `mirror profile --json` emits the deterministic summary for an LLM to synthesize the enriched write‑up; plain `mirror profile` renders a deterministic baseline itself. Extraction adds one column (`tool_call.pkgs`) — bump to schema v2, auto‑migrated via `ingest --full`.
+
+## Feeding it into an input method (Handy bridge)
+
+The mirror can also distill your usage history into a small **context artifact** for a local voice input method ([Handy](https://github.com/cjpais/Handy) / 元宝输入法), so speech‑to‑text and prompt refinement inherit *your* vocabulary and engineering priors instead of generic defaults. Separation of concerns: the mirror **exports**, the input method **imports** — neither reaches into the other.
+
+```bash
+python3 scripts/export_input_profile.py   # writes .state/input_profile.json (schema yuanbao-input-profile/v2)
+```
+
+Deterministic, read‑only, offline. It reads the existing `digest.json` (+ `mirror.db` when present; `--no-db` degrades gracefully) and splits into two native channels:
+
+- **`terms`** — high‑frequency domain proper nouns (project names, CamelCase libraries, acronyms, hot CJK words) → the input method's **dictionary hotwords**, improving ASR/refinement on names you actually use. A literal‑hit channel; kept conservative (precision over recall).
+- **`facts`** — structured personal memory (`topic` + `fact`): your **stack** (grouped frontend / editor / data‑backend / testing / AI‑agent / desktop‑infra), **languages**, **projects**, and **collaboration style** → the input method's **memory facts**, giving refinement and the agent a *data‑backed* engineering prior. Confidence thresholds split by source — a package the AI actually **installed** counts at ≥1, a library only **mentioned** in prompts needs ≥2. Capped at ≤14 to leave room for your own memories.
+- **`topics`** — v1 legacy project‑share sentences, kept only for backward compatibility; ignored when `facts` are present.
+
+On the input‑method side the artifact lands at a fixed path, so import is zero‑config: it **auto‑imports on startup** whenever the artifact's mtime has advanced past the last import (idempotent, and it won't fight your later manual edits), with a manual "import now" button as the other lane. Net loop: **run the export → next launch ingests it, no clicks.**
 
 ## The report
 
